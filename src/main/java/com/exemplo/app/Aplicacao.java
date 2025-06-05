@@ -1,9 +1,5 @@
 package com.exemplo.app;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-
 public class Aplicacao {
 	
 	public static void main(String[] args) {
