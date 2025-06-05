@@ -6,7 +6,7 @@
 
     <groupId>com.exemplo.automacao</groupId>
     <artifactId>projeto-automacao-release</artifactId>
-    <version>1.0.0-SNAPSHOT</version> <packaging>jar</packaging>
+    <version>1.0.1</version> <packaging>jar</packaging>
 
     <name>Projeto Automacao Release</name>
     <description>Projeto de exemplo para automacao de release</description>
