@@ -3,7 +3,7 @@ set -e # Sai imediatamente se um comando retornar um status de saída diferente 
 
 # --- Configurações Fixas ---
 # Sua branch principal de release. Todo o processo será feito AQUI.
-RELEASE_BRANCH="main" # Ou "master", dependendo da sua convenção
+RELEASE_BRANCH="release" # Ou "master", dependendo da sua convenção
 
 # Substitua com a URL do seu repositório Git
 # Se estiver usando SSH (git@github.com...) e seu agente SSH não estiver configurado para o ambiente
