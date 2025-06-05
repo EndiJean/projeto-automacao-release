@@ -1,85 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.exemplo.automacao</groupId>
-    <artifactId>projeto-automacao-release</artifactId>
-    <version>1.0.1</version> <packaging>jar</packaging>
+	<groupId>com.exemplo.automacao</groupId>
+	<artifactId>projeto-automacao-release</artifactId>
+	<version>1.0.1</version>
+	<packaging>jar</packaging>
 
-    <name>Projeto Automacao Release</name>
-    <description>Projeto de exemplo para automacao de release</description>
-
-    <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.6.0</version>
-                <executions>
-                    <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <configuration>
-                            <archive>
-                                <manifest>
-                                    <mainClass>com.exemplo.app.Aplicacao</mainClass>
-                                </manifest>
-                            </archive>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>versions-maven-plugin</artifactId>
-                <version>2.16.2</version>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>copy-config-file</id>
-                        <phase>package</phase> <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <target>
-                                <echo message="Copiando e atualizando configuracao.txt na pasta target..." />
-                                <copy file="${project.basedir}/src/main/resources/configuracao.txt"
-                                      tofile="${project.build.directory}/configuracao_release.txt"/>
-                                <replace file="${project.build.directory}/configuracao_release.txt" token="@PROJECT_VERSION@" value="${project.version}"/>
-                                <tstamp> <format property="TODAY_DATE" pattern="yyyy-MM-dd HH:mm:ss" /> </tstamp>
-                                <replace file="${project.build.directory}/configuracao_release.txt" token="@BUILD_DATE@" value="${TODAY_DATE}"/>
-                            </target>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
-
-    <scm>
-        <connection>scm:git:https://github.com/seu-usuario/projeto-automacao-release.git</connection>
-        <developerConnection>scm:git:https://github.com/seu-usuario/projeto-automacao-release.git</developerConnection>
-        <url>https://github.com/seu-usuario/projeto-automacao-release</url>
-    </scm>
-
+	<name>Projeto Automacao Release</name>
+	<description>Projeto de exemplo para automacao de release</description>
 </project>
+

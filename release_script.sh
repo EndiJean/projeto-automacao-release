@@ -11,6 +11,8 @@ RELEASE_BRANCH="release" # Ou "master", dependendo da sua convenção
 # Ex: REPO_URL="https://seu-usuario:${GITHUB_TOKEN}@github.com/seu-usuario/projeto-automacao-release.git"
 REPO_URL="https://github.com/EndiJean/projeto-automacao-release.git" # Substitua pelo seu!
 
+VERSION_FILE="versao" # O nome do seu arquivo de texto com a versão
+
 # GIT_USER="AutomacaoRelease"
 # GIT_EMAIL="release@example.com"
 
@@ -141,8 +143,19 @@ echo "--------------------------------------------------------"
 
 # 7. Alterar a versão no pom.xml para a versão de release
 echo "-> Atualizando pom.xml para a versão de release: $RELEASE_VERSION"
+
+# Verifica se o arquivo de versão existe antes de tentar alterar
+if [ -f "$VERSION_FILE" ]; then
+    echo "-> Atualizando arquivo de versão '$VERSION_FILE' para: $RELEASE_VERSION"
+    echo "$RELEASE_VERSION" > "$VERSION_FILE" || { echo "Falha ao atualizar o arquivo de versão '$VERSION_FILE'. Abortando."; exit 1; }
+    git add "$VERSION_FILE" # Adiciona o arquivo de versão ao staging
+else
+    echo "AVISO: Arquivo de versão '$VERSION_FILE' não encontrado na raiz do projeto. Não foi possível atualizá-lo."
+fi
+
 mvn versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false || { echo "Falha ao setar versão no POM. Abortando."; exit 1; }
 git add pom.xml
+
 git commit -m "Atualizacao de versao: $RELEASE_VERSION" || { echo "Falha ao commitar versão de release. Abortando."; exit 1; } # Mensagem de commit padrão
 
 # 8. Criar a tag Git para a release
