@@ -65,7 +65,7 @@ git fetch origin || { echo "Falha ao buscar branches remotas. Verifique a conex�
 
 # 2. Garante que o repositório está limpo antes de iniciar os merges
 echo "-> Verificando status inicial do Git..."
-check_git_status
+verifica_pendencias
 
 # 3. Loop para informar as branches a serem mescladas
 MERGE_BRANCHES_REMOTE=()
