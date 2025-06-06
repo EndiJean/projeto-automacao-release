@@ -6,9 +6,5 @@ public class Aplicacao {
 		System.out.println("Aplicação de Exemplo Iniciada!");
 
 		System.out.println("Aplicação de Exemplo Encerrada.");
-		
-		System.out.println("Aplicação de Exemplo Encerrada. 002");
-
-		System.out.println("Aplicação de Exemplo Encerrada. 003");
     }
 }
