@@ -2,8 +2,9 @@
 set -e # Sai imediatamente se um comando retornar um status de saída diferente de zero
 
 # --- Configurações Fixas ---
-RELEASE_BRANCH="release" # Sua branch principal de release. Todo o processo será feito AQUI.
-VERSION_FILE="versao" # O nome do seu arquivo de texto com a versão
+RELEASE_BRANCH="release"       # Sua branch principal de release.
+DEVELOPMENT_BRANCH="desenvolvimento" # Nome da sua branch de desenvolvimento
+VERSION_FILE="versao"          # O nome do seu arquivo de texto com a versão
 
 # --- Funções Auxiliares ---
 
@@ -24,16 +25,18 @@ verifica_pendencias() {
     fi
 }
 
-# Função para executar um merge e lidar com conflitos
-fazer_merge_e_push() {
+# Função para executar um merge e lidar com conflitos (para merges de feature/fix)
+fazer_merge_e_push_branch() {
     BRANCH_TO_MERGE_REMOTE="$1" # Esta é a branch remota, ex: "origin/feature/xyz"
+    CURRENT_WORKING_BRANCH="$2" # A branch local onde o merge será feito (ex: release)
+
     echo "--------------------------------------------------------"
-    echo "-> Tentando fazer merge de '$BRANCH_TO_MERGE_REMOTE' para '$RELEASE_BRANCH'..."
-    if git merge --no-ff "$BRANCH_TO_MERGE_REMOTE" -m "Merge branch '$BRANCH_TO_MERGE_REMOTE' into $RELEASE_BRANCH for release"; then
+    echo "-> Tentando fazer merge de '$BRANCH_TO_MERGE_REMOTE' para '$CURRENT_WORKING_BRANCH'..."
+    if git merge --no-ff "$BRANCH_TO_MERGE_REMOTE" -m "Merge branch '$BRANCH_TO_MERGE_REMOTE' into $CURRENT_WORKING_BRANCH for release"; then
         echo "Merge de '$BRANCH_TO_MERGE_REMOTE' realizado com sucesso."
     else
         echo "--------------------------------------------------------"
-        echo "CONFLITO DE MERGE DETECTADO ao mesclar '$BRANCH_TO_MERGE_REMOTE'."
+        echo "CONFLITO DE MERGE DETECTADO ao mesclar '$BRANCH_TO_MERGE_REMOTE' em '$CURRENT_WORKING_BRANCH'."
         echo "Por favor, resolva os conflitos manualmente e faça um commit de merge."
         echo "Comandos úteis: git status, git diff, git add, git commit -m 'Merge de $BRANCH_TO_MERGE_REMOTE resolvido'."
         echo "Após resolver o conflito e commitar, pressione Enter para continuar..."
@@ -43,14 +46,15 @@ fazer_merge_e_push() {
         echo "Conflito de '$BRANCH_TO_MERGE_REMOTE' resolvido e commited."
     fi
 
-    echo "-> Fazendo push das alterações de merge para '$RELEASE_BRANCH'..."
-    git push origin "$RELEASE_BRANCH" || { echo "Falha ao fazer push da branch $RELEASE_BRANCH após merge de $BRANCH_TO_MERGE_REMOTE. Abortando."; exit 1; }
+    echo "-> Fazendo push das alterações de merge para '$CURRENT_WORKING_BRANCH'..."
+    git push origin "$CURRENT_WORKING_BRANCH" || { echo "Falha ao fazer push da branch $CURRENT_WORKING_BRANCH após merge de $BRANCH_TO_MERGE_REMOTE. Abortando."; exit 1; }
     echo "Push do merge de '$BRANCH_TO_MERGE_REMOTE' realizado com sucesso."
 }
 
+
 # --- Início do Script Principal ---
 echo "======================================================"
-echo "      Iniciando Processo de Release Automatizado      "
+echo "       Iniciando Processo de Release Automatizado      "
 echo "======================================================"
 
 # 1. Checkout para a branch de release e pull (e fetch de todas as remota)
@@ -67,7 +71,7 @@ git fetch origin || { echo "Falha ao buscar branches remotas. Verifique a conex�
 echo "-> Verificando status inicial do Git..."
 verifica_pendencias
 
-# 3. Loop para informar as branches a serem mescladas
+# 3. Loop para informar as branches a serem mescladas na RELEASE_BRANCH
 MERGE_BRANCHES_REMOTE=()
 while true; do
     echo "--------------------------------------------------------"
@@ -102,7 +106,7 @@ echo "--------------------------------------------------------"
 # 4. Executar merges sequencialmente com push após cada um
 echo "-> Iniciando processo de merge e push de cada branch remota informada..."
 for branch_to_merge_remote in "${MERGE_BRANCHES_REMOTE[@]}"; do
-    fazer_merge_e_push "$branch_to_merge_remote" # Chama a função que lida com o merge e push
+    fazer_merge_e_push_branch "$branch_to_merge_remote" "$RELEASE_BRANCH" # Chama a função que lida com o merge e push na branch de release
     echo "--------------------------------------------------------"
     read -p "Merge e push de '$branch_to_merge_remote' concluído. Pressione Enter para continuar para a próxima branch (se houver)..."
     echo "--------------------------------------------------------"
@@ -125,7 +129,7 @@ RELEASE_VERSION=${RELEASE_VERSION:-$CURRENT_POM_VERSION} # Usa a sugestão se a 
 echo "-> Versão de Release Definida: $RELEASE_VERSION"
 echo "--------------------------------------------------------"
 
-# 6. Alterar a versão no pom.xml para a versão de release
+# 6. Alterar a versão no pom.xml e no arquivo de versão
 echo "-> Atualizando pom.xml para a versão de release: $RELEASE_VERSION"
 
 # Verifica se o arquivo de versão existe antes de tentar alterar
@@ -142,14 +146,14 @@ git add pom.xml
 
 git commit -m "Atualizacao de versao: $RELEASE_VERSION" || { echo "Falha ao commitar versão de release. Abortando."; exit 1; } # Mensagem de commit padrão
 
-echo "-> Fazendo push da tag '$RELEASE_BRANCH'..."
+# --- NOVO: PUSH DO COMMIT DA BRANCH DE RELEASE ---
+echo "-> Fazendo push do commit de atualização de versão para '$RELEASE_BRANCH'..."
 git push origin "$RELEASE_BRANCH" || { echo "Falha ao fazer push da branch $RELEASE_BRANCH. Abortando."; exit 1; }
 
-# 7. Criar a tag Git para a release
+# 7. Criar a tag Git para a release E FAZER PUSH IMEDIATO DA TAG
 echo "-> Criando tag Git: $RELEASE_VERSION"
 git tag "$RELEASE_VERSION" || { echo "Falha ao criar tag Git. Abortando."; exit 1; }
 
-# --- PUSH DA TAG LOGO APÓS A CRIAÇÃO (apenas a tag recém-criada) ---
 echo "-> Fazendo push da tag '$RELEASE_VERSION' para o repositório remoto..."
 git push origin "$RELEASE_VERSION" || { echo "Falha ao fazer push da tag '$RELEASE_VERSION'. Abortando."; exit 1; }
 echo "-> Push da tag '$RELEASE_VERSION' realizado com sucesso."
@@ -167,6 +171,56 @@ else
     echo "AVISO: JAR não encontrado após o build. Verifique o pom.xml."
 fi
 
+---
+## NOVO PASSO: Merge da Release para a Branch de Desenvolvimento
+---
+
+# 10. Checkout para a branch de desenvolvimento, pull e merge da branch de release
+echo "--------------------------------------------------------"
+echo "-> Iniciando merge da branch '$RELEASE_BRANCH' na branch '$DEVELOPMENT_BRANCH'..."
+
+# Salva a branch atual para poder voltar depois
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# 10a. Checkout para a branch de desenvolvimento
+echo "-> Checkout para a branch '$DEVELOPMENT_BRANCH'..."
+git checkout "$DEVELOPMENT_BRANCH" || { echo "Falha ao mudar para a branch $DEVELOPMENT_BRANCH. Abortando merge final."; exit 1; }
+
+# 10b. Realiza um pull para garantir que a branch de desenvolvimento esteja atualizada
+echo "-> Realizando pull da branch '$DEVELOPMENT_BRANCH'..."
+git pull origin "$DEVELOPMENT_BRANCH" || { echo "Falha ao puxar da branch $DEVELOPMENT_BRANCH. Abortando merge final."; exit 1; }
+
+# 10c. Garante que a branch de desenvolvimento esteja limpa antes do merge
+echo "-> Verificando status do Git na branch '$DEVELOPMENT_BRANCH' antes do merge final..."
+verifica_pendencias # Reutiliza a função de verificação de pendências
+
+# 10d. Faz o merge da branch de release na branch de desenvolvimento
+echo "-> Fazendo merge da branch '$RELEASE_BRANCH' na '$DEVELOPMENT_BRANCH'..."
+if git merge --no-ff "$RELEASE_BRANCH" -m "Merge branch '$RELEASE_BRANCH' into $DEVELOPMENT_BRANCH after release $RELEASE_VERSION"; then
+    echo "Merge da '$RELEASE_BRANCH' na '$DEVELOPMENT_BRANCH' realizado com sucesso."
+else
+    echo "--------------------------------------------------------"
+    echo "CONFLITO DE MERGE DETECTADO ao mesclar '$RELEASE_BRANCH' na '$DEVELOPMENT_BRANCH'."
+    echo "Por favor, resolva os conflitos manualmente na '$DEVELOPMENT_BRANCH' e faça um commit de merge."
+    echo "Comandos úteis: git status, git diff, git add, git commit -m 'Merge da $RELEASE_BRANCH resolvido'."
+    echo "Após resolver o conflito e commitar, pressione Enter para continuar..."
+    echo "--------------------------------------------------------"
+    read -r # Espera o usuário pressionar Enter
+    verifica_pendencias # Verifica se o conflito foi realmente resolvido e commited
+    echo "Conflito de merge da '$RELEASE_BRANCH' na '$DEVELOPMENT_BRANCH' resolvido e commited."
+fi
+
+# 10e. Faz push da branch de desenvolvimento atualizada
+echo "-> Fazendo push da branch '$DEVELOPMENT_BRANCH' para o repositório remoto..."
+git push origin "$DEVELOPMENT_BRANCH" || { echo "Falha ao fazer push da branch $DEVELOPMENT_BRANCH após merge final. Abortando."; exit 1; }
+echo "Push da '$DEVELOPMENT_BRANCH' realizado com sucesso."
+
+# Volta para a branch original (release) se necessário, ou pode terminar aqui.
+# echo "-> Voltando para a branch anterior: '$CURRENT_BRANCH'..."
+# git checkout "$CURRENT_BRANCH" || { echo "AVISO: Falha ao voltar para a branch anterior '$CURRENT_BRANCH'. Permaneceu em $DEVELOPMENT_BRANCH."; }
+
+echo "--------------------------------------------------------"
+echo "Merge final da branch '$RELEASE_BRANCH' na '$DEVELOPMENT_BRANCH' concluído."
 echo "======================================================"
 echo "    Processo de Release Concluído com Sucesso!        "
 echo "        Versão Lançada: $RELEASE_VERSION              "
