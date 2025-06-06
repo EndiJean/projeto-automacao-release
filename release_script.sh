@@ -142,6 +142,7 @@ git add pom.xml
 
 git commit -m "Atualizacao de versao: $RELEASE_VERSION" || { echo "Falha ao commitar versão de release. Abortando."; exit 1; } # Mensagem de commit padrão
 
+echo "-> Fazendo push da tag '$RELEASE_BRANCH'..."
 git push origin "$RELEASE_BRANCH" || { echo "Falha ao fazer push da branch $RELEASE_BRANCH. Abortando."; exit 1; }
 
 # 7. Criar a tag Git para a release
