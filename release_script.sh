@@ -2,9 +2,9 @@
 set -e # Sai imediatamente se um comando retornar um status de saída diferente de zero
 
 # --- Configurações Fixas ---
-RELEASE_BRANCH="release"       # Sua branch principal de release.
-DEVELOPMENT_BRANCH="desenvolvimento" # Nome da sua branch de desenvolvimento
-VERSION_FILE="versao"          # O nome do seu arquivo de texto com a versão
+RELEASE_BRANCH="release"       # branch principal.
+DEVELOPMENT_BRANCH="desenvolvimento" # branch de desenvolvimento
+VERSION_FILE="versao"          # nome do arquivo de texto com a versão
 
 # --- Funções Auxiliares ---
 
@@ -51,7 +51,6 @@ fazer_merge_e_push_branch() {
     echo "Push do merge de '$BRANCH_TO_MERGE_REMOTE' realizado com sucesso."
 }
 
-
 # --- Início do Script Principal ---
 echo "======================================================"
 echo "       Iniciando Processo de Release Automatizado      "
@@ -65,7 +64,6 @@ git pull origin "$RELEASE_BRANCH" || { echo "Falha ao puxar da branch $RELEASE_B
 # Traz todas as referências remotas para o repositório local
 echo "-> Atualizando referências de branches remotas (git fetch origin)..."
 git fetch origin || { echo "Falha ao buscar branches remotas. Verifique a conexão e permissões."; exit 1; }
-
 
 # 2. Garante que o repositório está limpo antes de iniciar os merges
 echo "-> Verificando status inicial do Git..."
@@ -129,7 +127,7 @@ RELEASE_VERSION=${RELEASE_VERSION:-$CURRENT_POM_VERSION} # Usa a sugestão se a 
 echo "-> Versão de Release Definida: $RELEASE_VERSION"
 echo "--------------------------------------------------------"
 
-# 6. Alterar a versão no pom.xml e no arquivo de versão
+# 6. Alterar a versão no pom.xml e no arquivo de versão, e commitar
 echo "-> Atualizando pom.xml para a versão de release: $RELEASE_VERSION"
 
 # Verifica se o arquivo de versão existe antes de tentar alterar
@@ -146,23 +144,15 @@ git add pom.xml
 
 git commit -m "Atualizacao de versao: $RELEASE_VERSION" || { echo "Falha ao commitar versão de release. Abortando."; exit 1; } # Mensagem de commit padrão
 
-# --- NOVO: PUSH DO COMMIT DA BRANCH DE RELEASE ---
+# --- PUSH DO COMMIT DA BRANCH DE RELEASE (antes do build) ---
 echo "-> Fazendo push do commit de atualização de versão para '$RELEASE_BRANCH'..."
 git push origin "$RELEASE_BRANCH" || { echo "Falha ao fazer push da branch $RELEASE_BRANCH. Abortando."; exit 1; }
 
-# 7. Criar a tag Git para a release E FAZER PUSH IMEDIATO DA TAG
-echo "-> Criando tag Git: $RELEASE_VERSION"
-git tag "$RELEASE_VERSION" || { echo "Falha ao criar tag Git. Abortando."; exit 1; }
-
-echo "-> Fazendo push da tag '$RELEASE_VERSION' para o repositório remoto..."
-git push origin "$RELEASE_VERSION" || { echo "Falha ao fazer push da tag '$RELEASE_VERSION'. Abortando."; exit 1; }
-echo "-> Push da tag '$RELEASE_VERSION' realizado com sucesso."
-
-# 8. Executar o build do Maven para gerar o JAR e processar arquivos
+# 7. Executar o build do Maven para gerar o JAR e processar arquivos
 echo "-> Executando build do Maven (clean package)..."
 mvn clean package || { echo "Falha no build do Maven. Abortando."; exit 1; }
 
-# 9. Mover o JAR gerado para uma pasta de "releases" e renomear (opcional)
+# 8. Mover o JAR gerado para uma pasta de "releases" e renomear (opcional)
 if [ -f "target/projeto-automacao-release-${RELEASE_VERSION}-jar-with-dependencies.jar" ]; then
     echo "-> Movendo JAR para target/releases/..."
     mkdir -p target/releases
@@ -171,9 +161,13 @@ else
     echo "AVISO: JAR não encontrado após o build. Verifique o pom.xml."
 fi
 
----
-## NOVO PASSO: Merge da Release para a Branch de Desenvolvimento
----
+# 9. Criar a tag Git para a release e gaz push da tag
+echo "-> Criando tag Git: $RELEASE_VERSION"
+git tag "$RELEASE_VERSION" || { echo "Falha ao criar tag Git. Abortando."; exit 1; }
+
+echo "-> Fazendo push da tag '$RELEASE_VERSION' para o repositório remoto..."
+git push origin "$RELEASE_VERSION" || { echo "Falha ao fazer push da tag '$RELEASE_VERSION'. Abortando."; exit 1; }
+echo "-> Push da tag '$RELEASE_VERSION' realizado com sucesso."
 
 # 10. Checkout para a branch de desenvolvimento, pull e merge da branch de release
 echo "--------------------------------------------------------"
@@ -215,12 +209,9 @@ echo "-> Fazendo push da branch '$DEVELOPMENT_BRANCH' para o repositório remoto
 git push origin "$DEVELOPMENT_BRANCH" || { echo "Falha ao fazer push da branch $DEVELOPMENT_BRANCH após merge final. Abortando."; exit 1; }
 echo "Push da '$DEVELOPMENT_BRANCH' realizado com sucesso."
 
-# Volta para a branch original (release) se necessário, ou pode terminar aqui.
-# echo "-> Voltando para a branch anterior: '$CURRENT_BRANCH'..."
-# git checkout "$CURRENT_BRANCH" || { echo "AVISO: Falha ao voltar para a branch anterior '$CURRENT_BRANCH'. Permaneceu em $DEVELOPMENT_BRANCH."; }
+# Retorna para a branch de release
+git checkout "$RELEASE_BRANCH" || { echo "AVISO: Falha ao retornar para a branch '$RELEASE_BRANCH'. Permaneceu em $DEVELOPMENT_BRANCH."; }
 
-echo "--------------------------------------------------------"
-echo "Merge final da branch '$RELEASE_BRANCH' na '$DEVELOPMENT_BRANCH' concluído."
 echo "======================================================"
 echo "    Processo de Release Concluído com Sucesso!        "
 echo "        Versão Lançada: $RELEASE_VERSION              "
