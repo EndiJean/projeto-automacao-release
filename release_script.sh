@@ -129,6 +129,11 @@ echo "--------------------------------------------------------"
 ## 6. Alterar a versão no pom.xml, no arquivo de versão e commitar
 echo "-> Atualizando pom.xml para a versão de release: $RELEASE_VERSION"
 
+# Atualiza a versão principal no pom.xml
+mvn -f "$DIRETORIO_DO_SCRIPT/pom.xml" versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false || { echo "Falha ao setar versão no POM. Abortando."; exit 1; }
+
+git add "$DIRETORIO_DO_SCRIPT/pom.xml"
+
 CAMINHO_COMPLETO_ARQUIVO_VERSAO="$DIRETORIO_DO_SCRIPT/$VERSION_FILE"
 
 # Verifica se o arquivo de versão existe antes de tentar alterar
@@ -139,11 +144,6 @@ if [ -f "$CAMINHO_COMPLETO_ARQUIVO_VERSAO" ]; then
 else
     echo "AVISO: Arquivo de versão '$VERSION_FILE' não encontrado na raiz do projeto ($DIRETORIO_DO_SCRIPT). Não foi possível atualizá-lo."
 fi
-
-# Atualiza a versão principal no pom.xml
-mvn -f "$DIRETORIO_DO_SCRIPT/pom.xml" versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false || { echo "Falha ao setar versão no POM. Abortando."; exit 1; }
-
-git add "$DIRETORIO_DO_SCRIPT/pom.xml"
 
 # PAUSA ADICIONADA: Após as alterações no pom.xml e antes do commit
 echo "--------------------------------------------------------"
@@ -286,6 +286,6 @@ if [[ "$MERGE_DESENVOLVIMENTO" =~ ^[Ss]$ ]]; then
 fi
 
 echo "======================================================"
-echo "    Processo de Release Concluído com Sucesso!        "
+echo "    Processo de Versão Concluído com Sucesso!        "
 echo "        Versão Lançada: $RELEASE_VERSION              "
 echo "======================================================"
