@@ -1,6 +1,16 @@
 set -e
 
-DIRETORIO_DO_SCRIPT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # Obtém o diretório absoluto do script.
+# DIRETORIO_DO_SCRIPT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # Obtém o diretório absoluto do script.
+read -p "Informe o caminho absoluto do diretório do projeto Git: " DIRETORIO_DO_SCRIPT
+DIRETORIO_DO_SCRIPT="${DIRETORIO_DO_SCRIPT%/}" # Remove a barra final se houver
+
+if [ ! -d "$DIRETORIO_DO_SCRIPT/.git" ]; then
+    echo "ERRO: O diretório informado não parece ser um repositório Git válido."
+    exit 1
+fi
+
+cd "$DIRETORIO_DO_SCRIPT"
+
 RELEASE_BRANCH="release" # branch principal.
 DEVELOPMENT_BRANCH="desenvolvimento" # branch de desenvolvimento
 VERSION_FILE="versao" # nome do arquivo de texto com a versão
@@ -194,8 +204,12 @@ if [ -f "$CAMINHO_JAR_GERADO_ORIGEM" ]; then
     
     echo "-> JAR gerado encontrado: '$NOME_DO_ARQUIVO_JAR'."
 
-    DESTINO_PASTA_VERSOES="C:/versoes/$NOME_BASE_DO_JAR_SEM_EXT"
-
+    if [[ "$OSTYPE" == "cygwin" || "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+        DESTINO_PASTA_VERSOES="C:/versoes/$NOME_BASE_DO_JAR_SEM_EXT"
+    else 
+        DESTINO_PASTA_VERSOES="$HOME/versoes/$NOME_BASE_DO_JAR_SEM_EXT"
+    fi
+  
     # --- Cópia para C:/versoes/{nome_do_jar}/ ---
     echo "-> Criando pasta de destino em '$DESTINO_PASTA_VERSOES'..."
     mkdir -p "$DESTINO_PASTA_VERSOES" || { echo "Falha ao criar a pasta '$DESTINO_PASTA_VERSOES'. Verifique as permissões."; exit 1; }
