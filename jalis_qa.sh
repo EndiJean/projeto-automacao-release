@@ -53,6 +53,22 @@ echo "======================================================"
 echo "       Iniciando Gerenciador de Branches de QA        "
 echo "======================================================"
 
+# Verificar se o diretório existe e é um repositório Git
+read -p "Informe o caminho do diretório do repositório Git: " REPO_DIR
+
+if [ ! -d "$REPO_DIR" ]; then
+    echo "ERRO: O diretório '$REPO_DIR' não existe."
+    exit 1
+fi
+
+# Testa se é um repositório Git. A opção -C faz o comando ser executado no diretório especificado.
+if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "ERRO: O diretório '$REPO_DIR' não é um repositório Git válido."
+    exit 1
+fi
+
+cd "$REPO_DIR" || { echo "Erro ao acessar o diretório $REPO_DIR"; exit 1; }
+
 # 1. Garante que o repositório está limpo antes de iniciar
 echo "-> Verificando status inicial do Git..."
 verifica_pendencias
