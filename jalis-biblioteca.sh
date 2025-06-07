@@ -1,16 +1,32 @@
 set -e
 
-DIRETORIO_DO_SCRIPT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # Obtém o diretório absoluto do script.
-PASTA_TARGET_RELATIVA="target" # Nome da pasta 'target' relativa ao DIRETORIO_DO_SCRIPT
+# DIRETORIO_DO_SCRIPT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # Obtém o diretório absoluto do script.
 CAMINHO_PASTA_LIB="$HOME/lib" # Caminho da pasta de destino no diretório do usuário
 SCRIPT_GERADOR_HASH="gerarHash.jar" # Nome do arquivo JAR a ser executado na pasta 'lib'
-CAMINHO_COMPLETO_TARGET="$DIRETORIO_DO_SCRIPT/$PASTA_TARGET_RELATIVA" # Constrói o caminho completo para a pasta 'target'
+
+read -p "Informe o caminho do diretório do projeto (onde está o pom.xml): " DIRETORIO_DO_SCRIPT
+
+if [ ! -f "$DIRETORIO_DO_SCRIPT/pom.xml" ]; then
+    echo "ERRO: Não foi encontrado um pom.xml em '$DIRETORIO_DO_SCRIPT'."
+    exit 1
+fi
+
+# Testa se é um repositório Git. A opção -C faz o comando ser executado no diretório especificado.
+if ! git -C "$DIRETORIO_DO_SCRIPT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "ERRO: O diretório '$DIRETORIO_DO_SCRIPT' não é um repositório Git válido."
+    exit 1
+fi
+
+cd "$REPO_DIR" || { echo "Erro ao acessar o diretório $REPO_DIR"; exit 1; }
+
+CAMINHO_COMPLETO_TARGET="$DIRETORIO_DO_SCRIPT/target" # Constrói o caminho completo para a pasta 'target'
 
 echo "======================================================"
 echo "         Iniciando o Processo de Geração de Lib       "
 echo "======================================================"
 
 # echo "-> Executando build do Maven..."
+# (cd "$DIRETORIO_DO_SCRIPT" && mvn clean package) || { echo "Falha no build do Maven. Abortando."; exit 1; }
 # mvn clean package || { echo "Falha no build do Maven. Abortando."; exit 1; }
 
 # 1. Verificar se a pasta 'target' existe no diretório do script
@@ -50,6 +66,7 @@ if [ ! -f "$CAMINHO_JAR_ORIGEM" ]; then
     echo "Certifique-se de que o build do projeto foi executado e o JAR foi gerado corretamente."
     exit 1
 fi
+NOME_ORIGINAL_DO_JAR=$(basename "$CAMINHO_JAR_ORIGEM")
 echo "-> Arquivo JAR '$NOME_ORIGINAL_DO_JAR' encontrado e pronto para cópia."
 
 # 4. Criar a pasta 'lib' no diretório do usuário, se não existir
