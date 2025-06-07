@@ -1,32 +1,32 @@
 #!/bin/bash
 set -e # Sai imediatamente se um comando retornar um status de saída diferente de zero
 
-# --- Configurações Fixas ---
 SOURCE_BRANCH="desenvolvimento" # A branch da qual a branch de teste será criada
-
-# --- Funções Auxiliares ---
 
 # Função para checar o status do Git e pausar se houver alterações
 verifica_pendencias() {
-    if [[ $(git status --porcelain) ]]; then
+    # Obtém o nome do próprio script para excluí-lo
+    NOME_DO_PROPRIO_SCRIPT=$(basename "$0")
+
+    PENDENCIAS_EXCETO_SCRIPT=$(git status --porcelain | grep -v "$NOME_DO_PROPRIO_SCRIPT" || true)
+
+    if [[ -n "$PENDENCIAS_EXCETO_SCRIPT" ]]; then
         echo "--------------------------------------------------------"
         echo "ATENÇÃO: Existem alterações pendentes (modificações ou conflitos) no seu diretório de trabalho."
+        echo "O script '$NOME_DO_PROPRIO_SCRIPT' foi ignorado nesta verificação."
         echo "Por favor, resolva os conflitos (se houver) e faça commit de TODAS as alterações."
         echo "Após resolver e commitar, pressione Enter para continuar..."
         echo "--------------------------------------------------------"
-        read -r # Espera o usuário pressionar Enter
-        # Verifica novamente após o usuário continuar
-        if [[ $(git status --porcelain) ]]; then
-            echo "ERRO: O diretório de trabalho ainda não está limpo. Abortando o processo."
-            exit 1
-        fi
+        read -r
+        
+        verifica_pendencias
     fi
 }
 
 # Função para executar um merge e lidar com conflitos (para merges na branch de teste)
 fazer_merge_e_push_branch() {
-    BRANCH_TO_MERGE_REMOTE="$1"  # Branch remota a ser mesclada (ex: origin/feature/xyz)
-    TARGET_BRANCH_LOCAL="$2"     # Branch local onde o merge será feito (a branch de QA)
+    BRANCH_TO_MERGE_REMOTE="$1" # Branch remota a ser mesclada (ex: origin/feature/xyz)
+    TARGET_BRANCH_LOCAL="$2" # Branch local onde o merge será feito (a branch de QA)
 
     echo "--------------------------------------------------------"
     echo "-> Tentando fazer merge de '$BRANCH_TO_MERGE_REMOTE' para '$TARGET_BRANCH_LOCAL'..."
@@ -39,8 +39,8 @@ fazer_merge_e_push_branch() {
         echo "Comandos úteis: git status, git diff, git add, git commit -m 'Merge de $BRANCH_TO_MERGE_REMOTE resolvido'."
         echo "Após resolver o conflito e commitar, pressione Enter para continuar..."
         echo "--------------------------------------------------------"
-        read -r # Espera o usuário pressionar Enter
-        verifica_pendencias # Verifica se o conflito foi realmente resolvido e commited
+        read -r
+        verifica_pendencias
         echo "Conflito de '$BRANCH_TO_MERGE_REMOTE' resolvido e commited."
     fi
 
@@ -49,7 +49,6 @@ fazer_merge_e_push_branch() {
     echo "Push do merge de '$BRANCH_TO_MERGE_REMOTE' realizado com sucesso."
 }
 
-# --- Início do Script Principal ---
 echo "======================================================"
 echo "       Iniciando Gerenciador de Branches de QA        "
 echo "======================================================"
@@ -93,7 +92,6 @@ else
     git push -u origin "$QA_BRANCH_NAME" || { echo "Falha ao fazer push inicial da branch '$QA_BRANCH_NAME'. Abortando."; exit 1; }
 fi
 
-# Traz todas as referências remotas para o repositório local
 echo "-> Atualizando referências de branches remotas (git fetch origin)..."
 git fetch origin || { echo "Falha ao buscar branches remotas. Verifique a conexão e permissões."; exit 1; }
 
@@ -105,7 +103,7 @@ while true; do
     echo "--------------------------------------------------------"
     read -p "Informe o NOME da branch remota para fazer merge na '$QA_BRANCH_NAME' (ou deixe em branco para finalizar): " BRANCH_INPUT_NAME
     if [ -z "$BRANCH_INPUT_NAME" ]; then
-        break # Sai do loop se a entrada estiver vazias
+        break
     fi
 
     REMOTE_BRANCH_FULL_REF="origin/$BRANCH_INPUT_NAME"
@@ -132,7 +130,7 @@ else
     # 6. Executar merges sequencialmente com push após cada um
     echo "-> Iniciando processo de merge e push de cada branch remota informada..."
     for branch_to_merge_remote in "${MERGE_BRANCHES_REMOTE[@]}"; do
-        fazer_merge_e_push_branch "$branch_to_merge_remote" "$QA_BRANCH_NAME" # Chama a função que lida com o merge e push
+        fazer_merge_e_push_branch "$branch_to_merge_remote" "$QA_BRANCH_NAME"
         echo "--------------------------------------------------------"
         read -p "Merge e push de '$branch_to_merge_remote' concluído. Pressione Enter para continuar para a próxima branch (se houver)..."
         echo "--------------------------------------------------------"
