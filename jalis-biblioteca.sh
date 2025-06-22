@@ -1,35 +1,51 @@
 set -e
 
-# DIRETORIO_DO_SCRIPT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # Obtém o diretório absoluto do script.
 CAMINHO_PASTA_LIB="$HOME/lib" # Caminho da pasta de destino no diretório do usuário
 SCRIPT_GERADOR_HASH="gerarHash.jar" # Nome do arquivo JAR a ser executado na pasta 'lib'
 
-read -p "Informe o caminho do diretório do projeto (onde está o pom.xml): " DIRETORIO_DO_SCRIPT
+# --- 1. Solicita e Valida o Diretório do Projeto Maven ---
+read -p "Informe o caminho do diretório do projeto (onde está o pom.xml): " DIRETORIO_DO_PROJETO
 
-if [ ! -f "$DIRETORIO_DO_SCRIPT/pom.xml" ]; then
-    echo "ERRO: Não foi encontrado um pom.xml em '$DIRETORIO_DO_SCRIPT'."
+DIRETORIO_DO_PROJETO="${DIRETORIO_DO_PROJETO//\\//}"
+
+if [ -z "$DIRETORIO_DO_PROJETO" ]; then
+    echo "ERRO: O caminho do diretório do projeto não pode ser vazio."
     exit 1
 fi
 
-# Testa se é um repositório Git. A opção -C faz o comando ser executado no diretório especificado.
-if ! git -C "$DIRETORIO_DO_SCRIPT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "ERRO: O diretório '$DIRETORIO_DO_SCRIPT' não é um repositório Git válido."
+if [ ! -d "$DIRETORIO_DO_PROJETO" ]; then
+    echo "ERRO: O diretório '$DIRETORIO_DO_PROJETO' não existe."
+    exit 1
+fi
+
+if [ ! -f "$DIRETORIO_DO_PROJETO/pom.xml" ]; then
+    echo "ERRO: Não foi encontrado um pom.xml em '$DIRETORIO_DO_PROJETO'."
+    exit 1
+fi
+
+if ! git -C "$DIRETORIO_DO_PROJETO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "ERRO: O diretório '$DIRETORIO_DO_PROJETO' não é um repositório Git válido."
     exit 1
 fi
 
 cd "$REPO_DIR" || { echo "Erro ao acessar o diretório $REPO_DIR"; exit 1; }
 
-CAMINHO_COMPLETO_TARGET="$DIRETORIO_DO_SCRIPT/target" # Constrói o caminho completo para a pasta 'target'
+CAMINHO_COMPLETO_TARGET="$DIRETORIO_DO_PROJETO/target"
 
 echo "======================================================"
 echo "         Iniciando o Processo de Geração de Lib       "
 echo "======================================================"
+echo "-> Diretório do Projeto Maven: '$DIRETORIO_DO_PROJETO'"
 
-# echo "-> Executando build do Maven..."
-# (cd "$DIRETORIO_DO_SCRIPT" && mvn clean package) || { echo "Falha no build do Maven. Abortando."; exit 1; }
-# mvn clean package || { echo "Falha no build do Maven. Abortando."; exit 1; }
+# --- 2. Executar o Build do Maven com o Profile 'standalonelib' ---
+echo "-> Executando build do Maven com o perfil 'standalonelib'..."
+(cd "$DIRETORIO_DO_PROJETO" && mvn clean package -P standalonelib) || {
+    echo "Falha no build do Maven. Abortando."; 
+    exit 1; 
+}
+echo "-> Build do Maven concluído com sucesso."
 
-# 1. Verificar se a pasta 'target' existe no diretório do script
+# --- 3.Verificar se a pasta 'target' existe no diretório do script ---
 echo "-> Procurando a pasta '$CAMINHO_COMPLETO_TARGET'..."
 if [ ! -d "$CAMINHO_COMPLETO_TARGET" ]; then
     echo "ERRO: Pasta '$CAMINHO_COMPLETO_TARGET' não encontrada."
@@ -38,28 +54,27 @@ if [ ! -d "$CAMINHO_COMPLETO_TARGET" ]; then
 fi
 echo "-> Pasta '$CAMINHO_COMPLETO_TARGET' encontrada."
 
-# --- 2. Obter informações do JAR a partir do pom.xml ---
+# --- 4. Obter informações do JAR a partir do pom.xml ---
 echo "-> Lendo informações do pom.xml para determinar o nome do JAR..."
 
 # Usamos o Maven para extrair dados do pom.xml que está no mesmo diretório do script.
-ID_DO_ARTEFATO=$(mvn -f "$DIRETORIO_DO_SCRIPT/pom.xml" help:evaluate -Dexpression=project.artifactId -q -DforceStdout 2>/dev/null)
-VERSAO_DO_PROJETO=$(mvn -f "$DIRETORIO_DO_SCRIPT/pom.xml" help:evaluate -Dexpression=project.version -q -DforceStdout 2>/dev/null)
-EMPACOTAMENTO_DO_PROJETO=$(mvn -f "$DIRETORIO_DO_SCRIPT/pom.xml" help:evaluate -Dexpression=project.packaging -q -DforceStdout 2>/dev/null)
-NOME_FINAL_DO_BUILD=$(mvn -f "$DIRETORIO_DO_SCRIPT/pom.xml" help:evaluate -Dexpression=project.build.finalName -q -DforceStdout 2>/dev/null)
+ID_DO_ARTEFATO=$(mvn -f "$DIRETORIO_DO_PROJETO_MAVEN/pom.xml" help:evaluate -Dexpression=project.artifactId -q -DforceStdout 2>/dev/null)
+VERSAO_DO_PROJETO=$(mvn -f "$DIRETORIO_DO_PROJETO_MAVEN/pom.xml" help:evaluate -Dexpression=project.version -q -DforceStdout 2>/dev/null)
+EMPACOTAMENTO_DO_PROJETO=$(mvn -f "$DIRETORIO_DO_PROJETO/pom.xml" help:evaluate -Dexpression=project.packaging -q -DforceStdout 2>/dev/null)
+NOME_FINAL_DO_BUILD=$(mvn -f "$DIRETORIO_DO_PROJETO_MAVEN/pom.xml" help:evaluate -Dexpression=project.build.finalName -q -DforceStdout 2>/dev/null)
 
-# Determina a base do nome do JAR. O '<finalName>' do pom.xml tem precedência.
-if [[ -n "$NOME_FINAL_DO_BUILD" && "$NOME_FINAL_DO_BUILD" != "\${project.artifactId}-\${project.version}" ]]; then
-    BASE_NOME_JAR="${NOME_FINAL_DO_BUILD}"
+if [[ -n "$NOME_FINAL_DO_BUILD" && "$NOME_FINAL_DO_BUILD" != "\${project.artifactId}-\${project.version}" && "$NOME_FINAL_DO_BUILD" != "\${project.version}" ]]; then
+    BASE_NOME_JAR="$NOME_FINAL_DO_BUILD"
     echo "-> Usando '<finalName>' do pom.xml como base do nome: $BASE_NOME_JAR"
 else
     BASE_NOME_JAR="${ID_DO_ARTEFATO}-${VERSAO_DO_PROJETO}"
-    echo "-> Usando nome padrão (artifactId-version) como base do nome: $BASE_NOME_JAR"
+    echo "-> Usando nome padrão (artifactId-version) como base do nome (finalName não especificado ou é placeholder): $BASE_NOME_JAR"
 fi
 
 # Procura o arquivo JAR na pasta 'target' usando o nome base e a extensão de empacotamento.
 CAMINHO_JAR_ORIGEM=$(find "$CAMINHO_COMPLETO_TARGET" -maxdepth 1 -name "${BASE_NOME_JAR}*${EMPACOTAMENTO_DO_PROJETO}" | head -n 1)
 
-# 3. Validar a existência do arquivo JAR encontrado
+# 5. Validar a existência do arquivo JAR encontrado
 echo "-> Verificando a existência do arquivo JAR: '$CAMINHO_JAR_ORIGEM'..."
 if [ ! -f "$CAMINHO_JAR_ORIGEM" ]; then
     echo "ERRO: Arquivo JAR '$CAMINHO_JAR_ORIGEM' não encontrado. Abortando o processo."
@@ -69,21 +84,21 @@ fi
 NOME_ORIGINAL_DO_JAR=$(basename "$CAMINHO_JAR_ORIGEM")
 echo "-> Arquivo JAR '$NOME_ORIGINAL_DO_JAR' encontrado e pronto para cópia."
 
-# 4. Criar a pasta 'lib' no diretório do usuário, se não existir
+# 6. Criar a pasta 'lib' no diretório do usuário, se não existir
 echo "-> Verificando/Criando a pasta '$CAMINHO_PASTA_LIB' no diretório do usuário..."
 mkdir -p "$CAMINHO_PASTA_LIB" || { echo "Falha ao criar a pasta '$CAMINHO_PASTA_LIB'. Verifique as permissões de acesso."; exit 1; }
 echo "-> Pasta '$CAMINHO_PASTA_LIB' está pronta."
 
-# --- 5. Copiar o JAR para a pasta 'lib' e renomear opcionalmente ---
+# --- 7. Copiar o JAR para a pasta 'lib' e renomear opcionalmente ---
 NOME_FINAL_JAR_DESTINO="" # Variável que armazenará o nome final escolhido para o JAR copiado
 
 echo "--------------------------------------------------------"
 # Loop para garantir que um nome válido seja escolhido (seja o original ou um novo nome)
 while true; do
     read -p "Deseja renomear o arquivo JAR ao copiar para '$CAMINHO_PASTA_LIB'? (Nome atual: $NOME_ORIGINAL_DO_JAR) (s/N): " ESCOLHA_RENOMEAR
-    ESCOLHA_RENOMEAR=${ESCOLHA_RENOMEAR:-n} # Define 'n' como padrão se o usuário pressionar Enter
+    ESCOLHA_RENOMEAR=${ESCOLHA_RENOMEAR:-n}
 
-    NOME_BASE_PARA_VALIDACAO="" # Nome do JAR sem extensão para verificar conflitos de diretório
+    NOME_BASE_PARA_VALIDACAO=""
 
     if [[ "$ESCOLHA_RENOMEAR" =~ ^[Ss]$ ]]; then
         read -p "Informe o NOVO nome para o arquivo JAR (sem extensão .jar): " NOME_PERSONALIZADO_BASE
@@ -94,20 +109,16 @@ while true; do
         NOME_BASE_PARA_VALIDACAO="$NOME_PERSONALIZADO_BASE"
         NOME_FINAL_JAR_DESTINO="${NOME_PERSONALIZADO_BASE}.jar"
     else
-        # Se não for renomear, usa o nome original.
-        # Extrai o nome do arquivo sem a extensão para validação do diretório.
         NOME_BASE_PARA_VALIDACAO=$(basename "$NOME_ORIGINAL_DO_JAR" .jar)
         NOME_FINAL_JAR_DESTINO="$NOME_ORIGINAL_DO_JAR"
         echo "-> Você optou por manter o nome original: '$NOME_ORIGINAL_DO_JAR'."
     fi
 
-    # Validação da existência de uma pasta com o mesmo nome
     PASTA_A_VERIFICAR="${CAMINHO_PASTA_LIB}/${NOME_BASE_PARA_VALIDACAO}"
     if [ -d "$PASTA_A_VERIFICAR" ]; then
         echo "ERRO: Já existe uma pasta com o nome '$NOME_BASE_PARA_VALIDACAO' em '$CAMINHO_PASTA_LIB'."
         echo "Por favor, escolha um nome diferente ou remova a pasta existente para prosseguir."
         
-        # Se o usuário escolheu NÃO renomear e a pasta existe, oferece a opção de renomear AGORA.
         if [[ "$ESCOLHA_RENOMEAR" =~ ^[Nn]$ ]]; then
             read -p "A pasta '$NOME_BASE_PARA_VALIDACAO' já existe. Deseja tentar renomear o JAR agora? (s/N): " FORCAR_RENOMEAR
             FORCAR_RENOMEAR=${FORCAR_RENOMEAR:-n}
@@ -132,7 +143,7 @@ echo "-> Copiando '$CAMINHO_JAR_ORIGEM' para '$CAMINHO_JAR_DESTINO'..."
 cp "$CAMINHO_JAR_ORIGEM" "$CAMINHO_JAR_DESTINO" || { echo "Falha ao copiar o arquivo JAR. Verifique as permissões."; exit 1; }
 echo "-> Arquivo copiado com sucesso. Nome de destino: '$NOME_FINAL_JAR_DESTINO' em '$CAMINHO_PASTA_LIB'."
 
-# --- 6. Executar o arquivo 'gerarHash.jar' na pasta 'lib' ---
+# --- 7. Executar o arquivo 'gerarHash.jar' na pasta 'lib' ---
 CAMINHO_COMPLETO_SCRIPT_HASH="$CAMINHO_PASTA_LIB/$SCRIPT_GERADOR_HASH"
 echo "-> Verificando e executando o arquivo '$SCRIPT_GERADOR_HASH' em '$CAMINHO_PASTA_LIB'..."
 

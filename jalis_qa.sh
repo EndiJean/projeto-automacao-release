@@ -5,22 +5,38 @@ SOURCE_BRANCH="desenvolvimento" # A branch da qual a branch de teste será criad
 
 # Função para checar o status do Git e pausar se houver alterações
 verifica_pendencias() {
-    # Obtém o nome do próprio script para excluí-lo
-    NOME_DO_PROPRIO_SCRIPT=$(basename "$0")
+    local project_dir="$1"
+    local ignore_patterns_for_check=() 
 
-    PENDENCIAS_EXCETO_SCRIPT=$(git status --porcelain | grep -v "$NOME_DO_PROPRIO_SCRIPT" || true)
+    # Adiciona o próprio script e o .classpath à lista de exclusão para esta verificação
+    ignore_patterns_for_check+=("$(basename "$0")")
+    ignore_patterns_for_check+=(.classpath)
 
-    if [[ -n "$PENDENCIAS_EXCETO_SCRIPT" ]]; then
-        echo "--------------------------------------------------------"
-        echo "ATENÇÃO: Existem alterações pendentes (modificações ou conflitos) no seu diretório de trabalho."
-        echo "O script '$NOME_DO_PROPRIO_SCRIPT' foi ignorado nesta verificação."
-        echo "Por favor, resolva os conflitos (se houver) e faça commit de TODAS as alterações."
-        echo "Após resolver e commitar, pressione Enter para continuar..."
-        echo "--------------------------------------------------------"
-        read -r
-        
-        verifica_pendencias
-    fi
+    local git_status_cmd="git -C \"$project_dir\" status --porcelain"
+    for pattern in "${ignore_patterns_for_check[@]}"; do
+        git_status_cmd+=" | grep -v $(printf %q "$pattern")"
+    done
+    git_status_cmd+=" || true"
+
+    while true; do
+        local PENDENCIAS_FILTRADAS=$(eval "$git_status_cmd") 
+
+        if [[ -n "$PENDENCIAS_FILTRADAS" ]]; then
+            echo "--------------------------------------------------------"
+            echo "ATENÇÃO: Existem alterações pendentes (modificações, não staged, conflitos) no seu diretório de trabalho ($project_dir):"
+            echo "--------------------------------------------------------"
+            echo "$PENDENCIAS_FILTRADAS"
+            echo "--------------------------------------------------------"
+            echo "O script '$(basename "$0")' e o arquivo '.classpath' foram ignorados nesta verificação."
+            echo "Por favor, resolva as pendências listadas acima (faça commit ou stash)."
+            echo "Após resolver, pressione Enter para continuar..."
+            echo "--------------------------------------------------------"
+            read -r
+        else
+            echo "-> Diretório de trabalho limpo (considerando as exclusões do script e do .classpath). Prosseguindo."
+            break
+        fi
+    done
 }
 
 # Função para executar um merge e lidar com conflitos (para merges na branch de teste)

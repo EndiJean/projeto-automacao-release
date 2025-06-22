@@ -1,8 +1,8 @@
 set -e
 
-# DIRETORIO_DO_SCRIPT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )" # Obtém o diretório absoluto do script.
 read -p "Informe o caminho absoluto do diretório do projeto Git: " DIRETORIO_DO_SCRIPT
-DIRETORIO_DO_SCRIPT="${DIRETORIO_DO_SCRIPT%/}" # Remove a barra final se houver
+DIRETORIO_DO_SCRIPT="${DIRETORIO_DO_SCRIPT//\\//}"
+DIRETORIO_DO_SCRIPT="${DIRETORIO_DO_SCRIPT%/}"
 
 if [ ! -d "$DIRETORIO_DO_SCRIPT/.git" ]; then
     echo "ERRO: O diretório informado não parece ser um repositório Git válido."
@@ -18,16 +18,38 @@ PROJECT_NAME="artifactId" # Usado para obter o artifactId do pom.xml
 
 # Função para checar o status do Git e pausar se houver alterações
 verifica_pendencias() {
-    if [[ $(git status --porcelain) ]]; then
-        echo "--------------------------------------------------------"
-        echo "ATENÇÃO: Existem alterações pendentes (modificações ou conflitos) no seu diretório de trabalho."
-        echo "Por favor, resolva os conflitos (se houver) e faça commit de TODAS as alterações."
-        echo "Após resolver e commitar, pressione Enter para continuar..."
-        echo "--------------------------------------------------------"
-        read -r # Espera o usuário pressionar Enter
-        # Verifica novamente após o usuário continuar
-        verifica_pendencias
-    fi
+    local project_dir="$1"
+    local ignore_patterns_for_check=() 
+
+    # Adiciona o próprio script e o .classpath à lista de exclusão para esta verificação
+    ignore_patterns_for_check+=("$(basename "$0")")
+    ignore_patterns_for_check+=(.classpath)
+
+    local git_status_cmd="git -C \"$project_dir\" status --porcelain"
+    for pattern in "${ignore_patterns_for_check[@]}"; do
+        git_status_cmd+=" | grep -v $(printf %q "$pattern")"
+    done
+    git_status_cmd+=" || true"
+
+    while true; do
+        local PENDENCIAS_FILTRADAS=$(eval "$git_status_cmd") 
+
+        if [[ -n "$PENDENCIAS_FILTRADAS" ]]; then
+            echo "--------------------------------------------------------"
+            echo "ATENÇÃO: Existem alterações pendentes (modificações, não staged, conflitos) no seu diretório de trabalho ($project_dir):"
+            echo "--------------------------------------------------------"
+            echo "$PENDENCIAS_FILTRADAS"
+            echo "--------------------------------------------------------"
+            echo "O script '$(basename "$0")' e o arquivo '.classpath' foram ignorados nesta verificação."
+            echo "Por favor, resolva as pendências listadas acima (faça commit ou stash)."
+            echo "Após resolver, pressione Enter para continuar..."
+            echo "--------------------------------------------------------"
+            read -r
+        else
+            echo "-> Diretório de trabalho limpo (considerando as exclusões do script e do .classpath). Prosseguindo."
+            break
+        fi
+    done
 }
 
 # Função para executar um merge e lidar com conflitos (para merges de feature/fix)
